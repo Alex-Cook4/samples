@@ -8,6 +8,8 @@ namespace com.ibm.streamsx.geospatial.sample ;
 use com.ibm.streams.geospatial::* ;
 use com.ibm.streams.geospatial.ext::* ;
 use com.ibm.streams.geospatial::Geofence ;
+use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
+use com.ibm.streamsx.messaging.kafka::KafkaConsumer ;
 
 /**This application demonstrates the basic use of the GeoFence operator.
  * There are two data sources to this application:
@@ -37,7 +39,7 @@ composite GeofenceMarketingMain
 		}
 
 		@spl_note(id = "0", text = "Detect entities entering shopping center")
-		stream<Point, MatchedFences> GeofenceEvents = Geofence(GpsFromCellPhones_out0
+		stream<Point, MatchedFences> GeofenceEvents = Geofence(KafkaConsumer_9_out0
 			as inPort0Alias ; PolygonStream)
 		{
 			param
@@ -106,24 +108,46 @@ composite GeofenceMarketingMain
 				initDelay : 3.0 ;
 		}
 
-		(stream<rstring id, rstring wkt> GpsFromCellPhones_out0) as
-			GpsFromCellPhones = Custom()
-		{
-			logic
-				onProcess :
-				{
-					while(! isShutdown())
-					{
-						float64 latitude = randomLatitude(43.80792132384321, 43.8518832177072) ;
-						float64 longitude = randomLongitude(- 79.52736854553223, -
-							79.55174446105957) ;
-						rstring id = randomId(10, 10) ;
-						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
-							latitude) }, GpsFromCellPhones_out0) ;
-						block(0.5) ;
-					}
-				}
+//		(stream<rstring id, rstring wkt> GpsFromCellPhones_out0) as
+//			GpsFromCellPhones = Custom()
+//		{
+//			logic
+//				onProcess :
+//				{
+//					while(! isShutdown())
+//					{
+//						float64 latitude = randomLatitude(43.80792132384321, 43.8518832177072) ;
+//						float64 longitude = randomLongitude(- 79.52736854553223, -
+//							79.55174446105957) ;
+//						rstring id = randomId(10, 10) ;
+//						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
+//							latitude) }, GpsFromCellPhones_out0) ;
+//						block(0.5) ;
+//					}
+//
+//				}
+//
+//		}
 
+//		() as KafkaProducer_8 = KafkaProducer(GpsFromCellPhones_out0)
+//		{
+//			param
+//				topic : "geofenceMarketingGPS" ;
+//				keyAttribute : "id" ;
+//				messageAttribute : "wkt" ;
+//				propertiesFile : "etc/producer.properties" ;
+//		}
+
+		(stream<rstring id, rstring wkt> KafkaConsumer_9_out0) as KafkaConsumer_9 =
+			KafkaConsumer()
+		{
+			param
+				topic : "geofenceMarketingGPS";
+				keyAttribute : "id";
+				messageAttribute : "wkt";
+				propertiesFile : "etc/consumer.properties";
 		}
+		
+		() as CustomerGPSGenerator = GpsFromCustomerGenerator(){}
 
 }

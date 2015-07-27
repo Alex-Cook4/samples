@@ -1,0 +1,37 @@
+namespace com.ibm.streamsx.geospatial.sample;
+
+use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
+
+public composite GpsFromCustomerGenerator()
+{
+	graph
+		(stream<rstring id, rstring wkt> GpsFromCellPhones_out0) as
+			GpsFromCellPhones = Custom()
+		{
+			logic
+				onProcess :
+				{
+					while(! isShutdown())
+					{
+						float64 latitude = randomLatitude(43.80792132384321, 43.8518832177072) ;
+						float64 longitude = randomLongitude(- 79.52736854553223, -
+							79.55174446105957) ;
+						rstring id = randomId(10, 10) ;
+						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
+							latitude) }, GpsFromCellPhones_out0) ;
+						block(0.5) ;
+					}
+
+				}
+
+		}
+
+		() as KafkaProducer_8 = KafkaProducer(GpsFromCellPhones_out0)
+		{
+			param
+				topic : "geofenceMarketingGPS" ;
+				keyAttribute : "id" ;
+				messageAttribute : "wkt" ;
+				propertiesFile : "etc/producer.properties" ;
+		}
+}
