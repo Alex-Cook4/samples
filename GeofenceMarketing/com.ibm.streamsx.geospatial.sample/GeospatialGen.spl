@@ -35,9 +35,45 @@ public stateful rstring randomId(int32 minId, int32 numEntities)
 {
 	float64 randomNum = random() ;
 	int32 range = numEntities ;
-	
 	rstring id = (rstring)((int32)((float64)minId + (randomNum * (float64)range))) ;
 	return id;
+}
+
+/** Generate a random age
+ * @param minAge minimum value of the age to generated
+ * @param maxAge max value of age to be generated
+ */
+public stateful rstring randomAge(int32 minAge, int32 maxAge)
+{
+	float64 randomNum = random() ;
+	int32 range = maxAge - minAge ;
+	
+	rstring age = (rstring)((int32)((float64)minAge + (randomNum * (float64)range))) ;
+	return age;
+}
+
+/** Generate a random gender
+ */
+public stateful rstring randomGender()
+{
+	mutable rstring gender;
+	float64 randomNum = random();
+	
+	if (randomNum > 0.5){
+		gender = "male";
+	} else {
+		gender = "female";
+	}
+	
+	return gender;
+}
+
+/** Generate a random gender
+ */
+public stateful rstring randomInterest(list<rstring> interestOptions)
+{
+	int32 randIndex = (int32) ((float64)size(interestOptions) * random());
+	return interestOptions[randIndex];
 }
 
 /** Return promotions based on the given ID.

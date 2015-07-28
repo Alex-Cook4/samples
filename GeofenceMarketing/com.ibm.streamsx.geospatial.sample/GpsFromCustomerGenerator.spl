@@ -1,9 +1,16 @@
-namespace com.ibm.streamsx.geospatial.sample;
+namespace com.ibm.streamsx.geospatial.sample ;
 
 use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
 
 public composite GpsFromCustomerGenerator()
 {
+	param
+		expression $minId : 10 ;
+		expression $numEntities : 10 ;
+		expression $minAge : 14 ;
+		expression $maxAge : 99 ;
+		expression $interestList : [ "fashion", "gadgets", "furniture", "jewelry",
+			"sports" ] ;
 	graph
 		(stream<rstring id, rstring wkt> GpsFromCellPhones_out0) as
 			GpsFromCellPhones = Custom()
@@ -11,12 +18,13 @@ public composite GpsFromCustomerGenerator()
 			logic
 				onProcess :
 				{
+					block(4.0) ; //wait for things to get started
 					while(! isShutdown())
 					{
 						float64 latitude = randomLatitude(43.80792132384321, 43.8518832177072) ;
 						float64 longitude = randomLongitude(- 79.52736854553223, -
 							79.55174446105957) ;
-						rstring id = randomId(10, 10) ;
+						rstring id = randomId($minId, $numEntities) ;
 						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
 							latitude) }, GpsFromCellPhones_out0) ;
 						block(0.5) ;
@@ -34,4 +42,35 @@ public composite GpsFromCustomerGenerator()
 				messageAttribute : "wkt" ;
 				propertiesFile : "etc/producer.properties" ;
 		}
+
+		(stream<rstring id, rstring age, rstring gender, rstring interest>
+			GeneratedProfile as O) as Beacon_3 = Custom()
+		{
+			logic
+				onProcess :
+				{
+					for(int32 i in range($minId, $minId + $numEntities, 1))
+					{
+						rstring id = i ;
+						rstring age = randomAge($minAge, $maxAge) ;
+						rstring gender = randomGender() ;
+						rstring interest = randomInterest($interestList) ;
+						printStringLn("id: " + id + " age: " + age + " gender: " + gender +
+							"interest:" + interest) ;
+						submit({ id = id, age = age, gender = gender, interest = interest },
+							GeneratedProfile) ;
+					}
+
+				}
+
+		}
+
+		() as FileSink_4 = FileSink(GeneratedProfile as inputStream)
+		{
+			param
+				file : "profiles.dat" ;
+				format : csv ;
+				flush : 1u;
+		}
+
 }

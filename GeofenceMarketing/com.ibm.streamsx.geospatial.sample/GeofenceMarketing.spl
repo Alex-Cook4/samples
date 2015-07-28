@@ -31,6 +31,8 @@ composite GeofenceMarketingMain
 		FenceData = rstring fenceId, int32 fenceUpdateAction, rstring fencePolygon ;
 		MatchedFences = tuple<list<rstring> fences, list<rstring> fencesEntered,
 			list<rstring> fencesExited> ;
+		Profile = rstring id, rstring age, rstring gender, rstring interest ;
+		Offer = rstring offer ;
 	graph
 		stream<FenceData> PolygonStream = FileSource(FenceDir)
 		{
@@ -38,7 +40,6 @@ composite GeofenceMarketingMain
 				format : csv ;
 		}
 
-		@spl_note(id = "0", text = "Detect entities entering shopping center")
 		stream<Point, MatchedFences> GeofenceEvents = Geofence(KafkaConsumer_9_out0
 			as inPort0Alias ; PolygonStream)
 		{
@@ -50,8 +51,8 @@ composite GeofenceMarketingMain
 					fencesExited = FencesExited() ;
 		}
 
-		@spl_note(id = "0", text = "Send promotion based on entity location")
-		stream<MapViewerT> EntitiesWithPromotion = Functor(GeofenceEvents)
+		stream<MapViewerT> EntitiesWithPromotion = Functor(Join_13_out0 as
+			inPort0Alias)
 		{
 			logic
 				state :
@@ -59,17 +60,18 @@ composite GeofenceMarketingMain
 					mutable rstring promotions = "" ;
 				}
 
-				onTuple GeofenceEvents :
+				onTuple inPort0Alias :
 				{
 					promotions = "" ;
 					// if the entity has entered a geofence
-					if(size(GeofenceEvents.fencesEntered) > 0)
+					if(size(inPort0Alias.fencesEntered) > 0)
 					{
 					// for each geofence, find promotion and display on map
-						for(int32 i in range(GeofenceEvents.fencesEntered))
+						for(int32 i in range(inPort0Alias.fencesEntered))
 						{
-							rstring id = GeofenceEvents.fencesEntered [ i ] ;
-							promotions += getPromotion(id) ;
+							rstring location = inPort0Alias.fencesEntered [ i ] ;
+							promotions += location + ": " ;
+							promotions += offer ;
 							promotions += "\n" ;
 						}
 
@@ -81,6 +83,7 @@ composite GeofenceMarketingMain
 				EntitiesWithPromotion : updateAction = 1u, note = promotions, markerType =
 					GREEN ;
 		}
+
 		/** MapViewer makes use of the HTTPTupleView operator to allow us to visualize the data		
 		in a browser.		
 		*/
@@ -108,46 +111,82 @@ composite GeofenceMarketingMain
 				initDelay : 3.0 ;
 		}
 
-//		(stream<rstring id, rstring wkt> GpsFromCellPhones_out0) as
-//			GpsFromCellPhones = Custom()
-//		{
-//			logic
-//				onProcess :
-//				{
-//					while(! isShutdown())
-//					{
-//						float64 latitude = randomLatitude(43.80792132384321, 43.8518832177072) ;
-//						float64 longitude = randomLongitude(- 79.52736854553223, -
-//							79.55174446105957) ;
-//						rstring id = randomId(10, 10) ;
-//						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
-//							latitude) }, GpsFromCellPhones_out0) ;
-//						block(0.5) ;
-//					}
-//
-//				}
-//
-//		}
-
-//		() as KafkaProducer_8 = KafkaProducer(GpsFromCellPhones_out0)
-//		{
-//			param
-//				topic : "geofenceMarketingGPS" ;
-//				keyAttribute : "id" ;
-//				messageAttribute : "wkt" ;
-//				propertiesFile : "etc/producer.properties" ;
-//		}
-
 		(stream<rstring id, rstring wkt> KafkaConsumer_9_out0) as KafkaConsumer_9 =
 			KafkaConsumer()
 		{
 			param
-				topic : "geofenceMarketingGPS";
-				keyAttribute : "id";
-				messageAttribute : "wkt";
-				propertiesFile : "etc/consumer.properties";
+				topic : "geofenceMarketingGPS" ;
+				keyAttribute : "id" ;
+				messageAttribute : "wkt" ;
+				propertiesFile : "etc/consumer.properties" ;
 		}
-		
-		() as CustomerGPSGenerator = GpsFromCustomerGenerator(){}
+
+		() as CustomerGPSGenerator = GpsFromCustomerGenerator()
+		{
+		}
+
+		(stream<rstring id, rstring age, rstring gender, rstring interest>
+			FileSource_9_out0) as FileSource_9 = FileSource()
+		{
+			param
+				file : "profiles.dat" ;
+				format : csv ;
+				//deleteFile : true;
+				//initDelay : 2.0;
+				hotFile : true ;
+		}
+
+		stream<Point, MatchedFences, Profile> Join_10 = Join(GeofenceEvents as L ;
+			FileSource_9_out0 as R)
+		{
+			window
+				L : sliding, count(1u) ;
+				R : sliding, count(999u) ; //we don't actually want this to empty
+
+			param
+				equalityLHS : L.id ;
+				equalityRHS : R.id ;
+			output
+				Join_10 : id = L.id ; //, age = R.age, gender = R.gender
+				//, interest = R.interest ;
+
+		}
+
+		() as Custom_11 = FileSink(Join_10)
+		{
+			param
+				file : "outOfJoin.dat" ;
+				format : csv ;
+				flush : 1u ;
+		}
+
+		() as Custom_12 = FileSink(Join_13_out0 as InputStreamName0)
+		{
+			param
+				file : "outOfJoin2.dat" ;
+				format : csv ;
+				flush : 1u ;
+		}
+
+		(stream<rstring interest, rstring offer> FileSource_12_out0) as
+			FileSource_12 = FileSource()
+		{
+			param
+				file : "offers.dat" ;
+				format : csv ;
+		}
+
+		stream<Offer, Point, MatchedFences, Profile> Join_13_out0 = Join(Join_10 as
+			L ; FileSource_12_out0 as R)
+		{
+			window
+				L : sliding, count(1u) ;
+				R : sliding, count(999u) ;
+			param
+				equalityLHS : L.interest ;
+				equalityRHS : R.interest ;
+			output
+				Join_13_out0 : interest = L.interest ;
+		}
 
 }
