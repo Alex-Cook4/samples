@@ -10,7 +10,8 @@ use com.ibm.streams.geospatial.ext::* ;
 use com.ibm.streams.geospatial::Geofence ;
 use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
 use com.ibm.streamsx.messaging.kafka::KafkaConsumer ;
-
+use com.ibm.streamsx.hbase::* ;
+use com.ibm.streamsx.hbase::HBASEGet ;
 /**This application demonstrates the basic use of the GeoFence operator.
  * There are two data sources to this application:
  * * Randomized entities stream that simulates GPS data from cell phones
@@ -31,8 +32,10 @@ composite GeofenceMarketingMain
 		FenceData = rstring fenceId, int32 fenceUpdateAction, rstring fencePolygon ;
 		MatchedFences = tuple<list<rstring> fences, list<rstring> fencesEntered,
 			list<rstring> fencesExited> ;
-		Profile = rstring id, rstring age, rstring gender, rstring interest ;
-		Offer = rstring offer ;
+		Profile = rstring interest ;
+		Offer = map<rstring, map<rstring, rstring>> results ;
+		HBaseResult = rstring interest ; //map<rstring, map<rstring, rstring>> result ;
+
 	graph
 		stream<FenceData> PolygonStream = FileSource(FenceDir)
 		{
@@ -51,7 +54,7 @@ composite GeofenceMarketingMain
 					fencesExited = FencesExited() ;
 		}
 
-		stream<MapViewerT> EntitiesWithPromotion = Functor(Join_13_out0 as
+		stream<MapViewerT> EntitiesWithPromotion = Functor(GetOfferBasedOnInterest as
 			inPort0Alias)
 		{
 			logic
@@ -69,10 +72,11 @@ composite GeofenceMarketingMain
 					// for each geofence, find promotion and display on map
 						for(int32 i in range(inPort0Alias.fencesEntered))
 						{
-							rstring location = inPort0Alias.fencesEntered [ i ] ;
-							promotions += location + ": " ;
-							promotions += offer ;
-							promotions += "\n" ;
+						//rstring location = inPort0Alias.fencesEntered [ i ] ;
+							promotions += results [ "all" ] [ "store" ] + ":<br>" ;
+							promotions += results [ "all" ] [ "offer" ] + "<br>" ;
+							promotions += "Interest : " + interest ;
+							promotions += "<br>" ;
 						}
 
 					}
@@ -121,72 +125,41 @@ composite GeofenceMarketingMain
 				propertiesFile : "etc/consumer.properties" ;
 		}
 
-		() as CustomerGPSGenerator = GpsFromCustomerGenerator()
-		{
-		}
-
-		(stream<rstring id, rstring age, rstring gender, rstring interest>
-			FileSource_9_out0) as FileSource_9 = FileSource()
+		stream<Point, MatchedFences, HBaseResult> GetCustomerProfile =
+			HBASEGet(GeofenceEvents)
 		{
 			param
-				file : "profiles.dat" ;
-				format : csv ;
-				//deleteFile : true;
-				//initDelay : 2.0;
-				hotFile : true ;
+				tableName : "streamsCustomerProfiles" ;
+				rowAttrName : "id" ;
+				staticColumnFamily : "all" ;
+				staticColumnQualifier : "interest" ;
+				outAttrName : "interest" ;
 		}
 
-		stream<Point, MatchedFences, Profile> Join_10 = Join(GeofenceEvents as L ;
-			FileSource_9_out0 as R)
+		stream<Offer, Point, MatchedFences, Profile> GetOfferBasedOnInterest =
+			HBASEGet(Functor_17_out0 as L)
 		{
-			window
-				L : sliding, count(1u) ;
-				R : sliding, count(999u) ; //we don't actually want this to empty
-
 			param
-				equalityLHS : L.id ;
-				equalityRHS : R.id ;
+				rowAttrName : "interest" ;
+				tableName : "OffersBasedOnInterests" ;
+				outAttrName : "results" ;
+		}
+
+		(stream<Point, MatchedFences, Profile> Functor_17_out0) as Functor_17 =
+			Functor(GetCustomerProfile as inputStream)
+		{
+			logic
+				state : mutable Profile prof ;
 			output
-				Join_10 : id = L.id ; //, age = R.age, gender = R.gender
-				//, interest = R.interest ;
-
+				Functor_17_out0 : interest = inputStream.interest ;
 		}
 
-		() as Custom_11 = FileSink(Join_10)
-		{
-			param
-				file : "outOfJoin.dat" ;
-				format : csv ;
-				flush : 1u ;
-		}
-
-		() as Custom_12 = FileSink(Join_13_out0 as InputStreamName0)
-		{
-			param
-				file : "outOfJoin2.dat" ;
-				format : csv ;
-				flush : 1u ;
-		}
-
-		(stream<rstring interest, rstring offer> FileSource_12_out0) as
-			FileSource_12 = FileSource()
-		{
-			param
-				file : "offers.dat" ;
-				format : csv ;
-		}
-
-		stream<Offer, Point, MatchedFences, Profile> Join_13_out0 = Join(Join_10 as
-			L ; FileSource_12_out0 as R)
-		{
-			window
-				L : sliding, count(1u) ;
-				R : sliding, count(999u) ;
-			param
-				equalityLHS : L.interest ;
-				equalityRHS : R.interest ;
-			output
-				Join_13_out0 : interest = L.interest ;
-		}
+		//		() as HFileSink = FileSink(Functor_17_out0 as inPort0Alias)
+		//		{
+		//			param
+		//				file : "hbase.dat" ;
+		//				format : csv ;
+		//				flush : 1u ;
+		//		}
 
 }

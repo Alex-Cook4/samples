@@ -1,8 +1,9 @@
 namespace com.ibm.streamsx.geospatial.sample ;
 
 use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
+use com.ibm.streamsx.hbase::* ;
 
-public composite GpsFromCustomerGenerator()
+composite GpsFromCustomerGenerator()
 {
 	param
 		expression $minId : 10 ;
@@ -65,12 +66,37 @@ public composite GpsFromCustomerGenerator()
 
 		}
 
-		() as FileSink_4 = FileSink(GeneratedProfile as inputStream)
+		() as putsink = HBASEPut(Functor_5_out0)
 		{
 			param
-				file : "profiles.dat" ;
+				rowAttrName : "id" ;
+				tableName : "streamsCustomerProfiles" ;
+				staticColumnFamily : "all" ;
+				valueAttrName : "profileAttributes" ;
+		}
+
+		(stream<rstring id, tuple<rstring id, rstring age, rstring gender,
+			rstring interest> profileAttributes> Functor_5_out0) as Functor_5 =
+			Functor(GeneratedProfile)
+		{
+			output
+				Functor_5_out0 : id = id, profileAttributes = GeneratedProfile ;
+		}
+		
+		stream<rstring interest, tuple<rstring store, rstring offer> offerDetails> FileSource_12_out0 = FileSource()
+		{
+			param
+				file : "offers.dat" ;
 				format : csv ;
-				flush : 1u;
+		}
+		
+		() as putOffersSink = HBASEPut(FileSource_12_out0)
+		{
+			param
+				rowAttrName : "interest" ;
+				tableName : "OffersBasedOnInterests" ;
+				staticColumnFamily : "all" ;
+				valueAttrName : "offerDetails" ;
 		}
 
 }
