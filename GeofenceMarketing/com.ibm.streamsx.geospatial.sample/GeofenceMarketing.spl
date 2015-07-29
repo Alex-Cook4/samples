@@ -122,6 +122,7 @@ composite GeofenceMarketingMain
 				keyAttribute : "id" ;
 				messageAttribute : "wkt" ;
 				propertiesFile : "etc/consumer.properties" ;
+				partition: 0;
 		}
 
 		@parallel(width = 3)
