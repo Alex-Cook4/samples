@@ -34,8 +34,6 @@ composite GeofenceMarketingMain
 			list<rstring> fencesExited> ;
 		Profile = rstring interest ;
 		Offer = map<rstring, map<rstring, rstring>> results ;
-		HBaseResult = rstring interest ; //map<rstring, map<rstring, rstring>> result ;
-
 	graph
 		stream<FenceData> PolygonStream = FileSource(FenceDir)
 		{
@@ -72,8 +70,9 @@ composite GeofenceMarketingMain
 					// for each geofence, find promotion and display on map
 						for(int32 i in range(inPort0Alias.fencesEntered))
 						{
-						//rstring location = inPort0Alias.fencesEntered [ i ] ;
-							promotions += results [ "all" ] [ "store" ] + ":<br>" ;
+							rstring location = inPort0Alias.fencesEntered [ i ] ;
+							promotions = location ; //do this to kill warning for now. I don't like location being on the notification
+							promotions = results [ "all" ] [ "store" ] + ":<br>" ;
 							promotions += results [ "all" ] [ "offer" ] + "<br>" ;
 							promotions += "Interest : " + interest ;
 							promotions += "<br>" ;
@@ -125,7 +124,7 @@ composite GeofenceMarketingMain
 				propertiesFile : "etc/consumer.properties" ;
 		}
 
-		stream<Point, MatchedFences, HBaseResult> GetCustomerProfile =
+		stream<Point, MatchedFences, Profile> GetCustomerProfile =
 			HBASEGet(GeofenceEvents)
 		{
 			param
@@ -137,21 +136,12 @@ composite GeofenceMarketingMain
 		}
 
 		stream<Offer, Point, MatchedFences, Profile> GetOfferBasedOnInterest =
-			HBASEGet(Functor_17_out0 as L)
+			HBASEGet(GetCustomerProfile as L)
 		{
 			param
 				rowAttrName : "interest" ;
 				tableName : "OffersBasedOnInterests" ;
 				outAttrName : "results" ;
-		}
-
-		(stream<Point, MatchedFences, Profile> Functor_17_out0) as Functor_17 =
-			Functor(GetCustomerProfile as inputStream)
-		{
-			logic
-				state : mutable Profile prof ;
-			output
-				Functor_17_out0 : interest = inputStream.interest ;
 		}
 
 		//		() as HFileSink = FileSink(Functor_17_out0 as inPort0Alias)
