@@ -72,10 +72,11 @@ composite GeofenceMarketingMain
 						{
 							rstring location = inPort0Alias.fencesEntered [ i ] ;
 							promotions = location ; //do this to kill warning for now. I don't like location being on the notification
-							promotions = results [ "all" ] [ "store" ] + ":<br>" ;
+							promotions = "<strong>Interests: " + interest + "</strong><br><br>" ;
+							promotions +=
+								"<img src=\"Award_small.png\" width=\"16\" height=\"16\">  " ;
+							promotions += "<i>" + results [ "all" ] [ "store" ] + ":</i><br>" ;
 							promotions += results [ "all" ] [ "offer" ] + "<br>" ;
-							promotions += "Interest : " + interest ;
-							promotions += "<br>" ;
 						}
 
 					}
@@ -122,7 +123,7 @@ composite GeofenceMarketingMain
 				keyAttribute : "id" ;
 				messageAttribute : "wkt" ;
 				propertiesFile : "etc/consumer.properties" ;
-				partition: 0;
+				partition : 0 ;
 		}
 
 		@parallel(width = 3)
@@ -137,7 +138,6 @@ composite GeofenceMarketingMain
 				outAttrName : "interest" ;
 		}
 
-		@parallel(width = 3)
 		stream<Offer, Point, MatchedFences, Profile> GetOfferBasedOnInterest =
 			HBASEGet(GetCustomerProfile as L)
 		{
