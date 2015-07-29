@@ -118,12 +118,13 @@ composite GeofenceMarketingMain
 			KafkaConsumer()
 		{
 			param
-				topic : "geofenceMarketingGPS" ;
+				topic : "v_geofenceMarketingGPS" ;
 				keyAttribute : "id" ;
 				messageAttribute : "wkt" ;
 				propertiesFile : "etc/consumer.properties" ;
 		}
 
+		@parallel(width = 3)
 		stream<Point, MatchedFences, Profile> GetCustomerProfile =
 			HBASEGet(GeofenceEvents)
 		{
@@ -135,6 +136,7 @@ composite GeofenceMarketingMain
 				outAttrName : "interest" ;
 		}
 
+		@parallel(width = 3)
 		stream<Offer, Point, MatchedFences, Profile> GetOfferBasedOnInterest =
 			HBASEGet(GetCustomerProfile as L)
 		{
@@ -143,13 +145,5 @@ composite GeofenceMarketingMain
 				tableName : "OffersBasedOnInterests" ;
 				outAttrName : "results" ;
 		}
-
-		//		() as HFileSink = FileSink(Functor_17_out0 as inPort0Alias)
-		//		{
-		//			param
-		//				file : "hbase.dat" ;
-		//				format : csv ;
-		//				flush : 1u ;
-		//		}
 
 }

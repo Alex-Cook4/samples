@@ -7,7 +7,7 @@ composite GpsFromCustomerGenerator()
 {
 	param
 		expression $minId : 10 ;
-		expression $numEntities : 10 ;
+		expression $numEntities : 25 ;
 		expression $minAge : 14 ;
 		expression $maxAge : 99 ;
 		expression $interestList : [ "Fashion", "Gadgets", "Furniture", "Jewelry",
@@ -28,7 +28,7 @@ composite GpsFromCustomerGenerator()
 						rstring id = randomId($minId, $numEntities) ;
 						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
 							latitude) }, GpsFromCellPhones_out0) ;
-						block(0.5) ;
+//						block(0.5) ;
 					}
 
 				}
@@ -38,7 +38,7 @@ composite GpsFromCustomerGenerator()
 		() as KafkaProducer_8 = KafkaProducer(GpsFromCellPhones_out0)
 		{
 			param
-				topic : "geofenceMarketingGPS" ;
+				topic : "v_geofenceMarketingGPS" ;
 				keyAttribute : "id" ;
 				messageAttribute : "wkt" ;
 				propertiesFile : "etc/producer.properties" ;
@@ -82,14 +82,15 @@ composite GpsFromCustomerGenerator()
 			output
 				Functor_5_out0 : id = id, profileAttributes = GeneratedProfile ;
 		}
-		
-		stream<rstring interest, tuple<rstring store, rstring offer> offerDetails> FileSource_12_out0 = FileSource()
+
+		stream<rstring interest, tuple<rstring store, rstring offer> offerDetails>
+			FileSource_12_out0 = FileSource()
 		{
 			param
 				file : "offers.dat" ;
 				format : csv ;
 		}
-		
+
 		() as putOffersSink = HBASEPut(FileSource_12_out0)
 		{
 			param
