@@ -27,7 +27,7 @@ public composite MapViewer(input stream<MapViewerT> In0 )
 				context : "map" ;
 				partitionKey : "id" ;
 			config
-				placement : partitionColocation("mapviewer") ;
+				placement : host("d0101b09.pok.hpc-ng.ibm.com"), partitionColocation("mapviewer") ;
 		}
 
 }

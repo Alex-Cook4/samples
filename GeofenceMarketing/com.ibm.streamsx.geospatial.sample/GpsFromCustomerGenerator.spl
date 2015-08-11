@@ -28,13 +28,15 @@ composite GpsFromCustomerGenerator()
 						rstring id = randomId($minId, $numEntities) ;
 						submit({ id = id, wkt = com.ibm.streams.geospatial.ext::point(longitude,
 							latitude) }, GpsFromCellPhones_out0) ;
-//						block(0.5) ;
+							block(0.001) ;
+
 					}
 
 				}
 
 		}
 
+		@parallel(width = 3)
 		() as KafkaProducer_8 = KafkaProducer(GpsFromCellPhones_out0)
 		{
 			param
@@ -81,23 +83,6 @@ composite GpsFromCustomerGenerator()
 		{
 			output
 				Functor_5_out0 : id = id, profileAttributes = GeneratedProfile ;
-		}
-
-		stream<rstring interest, tuple<rstring store, rstring offer> offerDetails>
-			FileSource_12_out0 = FileSource()
-		{
-			param
-				file : "offers.dat" ;
-				format : csv ;
-		}
-
-		() as putOffersSink = HBASEPut(FileSource_12_out0)
-		{
-			param
-				rowAttrName : "interest" ;
-				tableName : "OffersBasedOnInterests" ;
-				staticColumnFamily : "all" ;
-				valueAttrName : "offerDetails" ;
 		}
 
 }

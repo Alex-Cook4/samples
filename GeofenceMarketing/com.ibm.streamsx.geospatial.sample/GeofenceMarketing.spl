@@ -126,7 +126,6 @@ composite GeofenceMarketingMain
 				partition : 0 ;
 		}
 
-		@parallel(width = 3)
 		stream<Point, MatchedFences, Profile> GetCustomerProfile =
 			HBASEGet(GeofenceEvents)
 		{
@@ -145,6 +144,96 @@ composite GeofenceMarketingMain
 				rowAttrName : "interest" ;
 				tableName : "OffersBasedOnInterests" ;
 				outAttrName : "results" ;
+		}
+
+		() as KafkaProducer_11 = KafkaProducer(Functor_13_out0 as inPort0Alias)
+		{
+			param
+				topic : "v_offers" ;
+				keyAttribute : "id" ;
+				messageAttribute : "msg" ;
+				propertiesFile : "etc/producer.properties" ;
+		}
+
+		@view(name = "OffersSent", port = Functor_12_out0, sampleSize = 200,
+			bufferTime = 60.0, description = "Promotion offers sent to customers",
+			activateOption = firstAccess)
+		(stream<rstring id, rstring interest, rstring store, rstring offer>
+			Functor_12_out0) as Functor_12 = Functor(GetOfferBasedOnInterest)
+		{
+			output
+				Functor_12_out0 : offer = results [ "all" ] [ "offer" ], store = results [
+					"all" ] [ "store" ], id = id, interest = interest ;
+		}
+
+		(stream<rstring id, rstring msg> Functor_13_out0) as Functor_13 =
+			Functor(Functor_12_out0)
+		{
+			output
+				Functor_13_out0 : msg =(rstring) Functor_12_out0 ;
+		}
+
+		(stream<rstring id, rstring msg> KafkaConsumerAccept_out0) as
+			KafkaConsumerAccept = KafkaConsumer()
+		{
+			param
+				topic : "v_offersAcceptance" ;
+				keyAttribute : "id" ;
+				messageAttribute : "msg" ;
+				propertiesFile : "etc/consumer.properties" ;
+				partition : 0 ;
+		}
+
+		(stream<rstring id, blob msg> Functor_14_out0) as Functor_14 =
+			Functor(KafkaConsumerAccept_out0)
+		{
+			output
+				Functor_14_out0 : msg = convertToBlob(msg) ;
+		}
+
+		(stream<rstring id, rstring interest, rstring store, rstring offer,
+			boolean accept> Parse_15_out0) as Parse_15 = Parse(Functor_14_out0)
+		{
+			param
+				format : txt ;
+				parseInput : msg ;
+		}
+
+		@view(name = "offersAccepted", port = Split_16_out0, sampleSize = 200,
+			bufferTime = 60.0, description = "Offers Accepted by Customers",
+			activateOption = firstAccess)
+		@view(name = "offersDeclined", port = Split_16_out1, sampleSize = 200,
+			bufferTime = 60.0, description = "Offers declined by customers",
+			activateOption = firstAccess)
+		(stream<rstring id, rstring interest, rstring store, rstring offer,
+			boolean accept> Split_16_out0 ; stream<rstring id, rstring interest,
+			rstring store, rstring offer, boolean accept> Split_16_out1) as Split_16 =
+			Split(Parse_15_out0)
+		{
+			param
+				index : accept?0:1 ;
+		}
+
+		() as Custom_17 = Custom(Split_16_out0 as inputStream)
+		{
+			logic
+				onTuple inputStream :
+				{
+				// Add code here
+
+				}
+
+		}
+
+		() as Custom_18 = Custom(Split_16_out1 as inputStream)
+		{
+			logic
+				onTuple inputStream :
+				{
+				// Add code here
+
+				}
+
 		}
 
 }

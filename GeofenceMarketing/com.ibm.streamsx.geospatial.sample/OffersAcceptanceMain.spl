@@ -1,0 +1,85 @@
+namespace com.ibm.streamsx.geospatial.sample ;
+
+use com.ibm.streamsx.messaging.kafka::KafkaProducer ;
+use com.ibm.streamsx.messaging.kafka::KafkaConsumer ;
+public stateful boolean randomAcceptOffer(rstring interest)
+{
+	float64 randomNum = random() ;
+	mutable float64 threshold = 0.5;
+	
+	if (interest == "Fashion")
+	{
+		threshold = 0.2;
+	}
+	else if (interest == "Sport" || interest == "Furniture")
+	{
+		threshold = 0.3;
+	}
+
+	if(randomNum > threshold)
+	{
+		return true ;
+	}
+
+	return false ;
+}
+
+composite OffersAcceptanceMain
+{
+	graph
+		(stream<rstring msg, rstring id> KafkaConsumer_9_out0) as KafkaConsumer_9 =
+			KafkaConsumer()
+		{
+			param
+				topic : "v_offers" ;
+				messageAttribute : "msg" ;
+				propertiesFile : "etc/consumer.properties" ;
+				partition : 0 ;
+				keyAttribute : "id" ;
+		}
+
+		(stream<rstring id, rstring interest, rstring store, rstring offer>
+			Parse_3_out0) as Parse_3 = Parse(Functor_5_out0 as inPort0Alias)
+		{
+			param
+				format : txt ;
+				parseInput : msg ;
+			config
+				placement : partitionColocation("parseOffers") ;
+		}
+
+		(stream<blob msg, rstring id> Functor_5_out0) as Functor_5 =
+			Functor(KafkaConsumer_9_out0)
+		{
+			output
+				Functor_5_out0 : msg = convertToBlob(msg) ;
+			config
+				placement : partitionColocation("parseOffers") ;
+		}
+
+		() as KafkaProducer_5 = KafkaProducer(Functor_7_out0 as inPort0Alias)
+		{
+			param
+				topic : "v_offersAcceptance" ;
+				keyAttribute : "id" ;
+				messageAttribute : "msg" ;
+				propertiesFile : "etc/producer.properties" ;
+		}
+
+		(stream<rstring id, rstring interest, rstring store, rstring offer,
+			boolean accept> Functor_6_out0) as Functor_6 = Functor(Parse_3_out0 as
+			inPort0Alias)
+		{
+			output
+				Functor_6_out0 : accept = randomAcceptOffer(interest) ;
+		}
+
+		(stream<rstring id, rstring msg> Functor_7_out0) as Functor_7 =
+			Functor(Functor_6_out0)
+		{
+			output
+				Functor_7_out0 : msg =(rstring) Functor_6_out0 ;
+		}
+
+}
+
